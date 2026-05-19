@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, GraduationCap, FileQuestion, BarChart, LogOut } from "lucide-react";
+import { Users, GraduationCap, FileQuestion, BarChart, LogOut, TrendingUp } from "lucide-react";
 
-export default function Sidebar() {
+export default function Sidebar({ className = "" }: { className?: string }) {
   const pathname = usePathname();
 
   const navItems = [
@@ -12,10 +12,11 @@ export default function Sidebar() {
     { name: "Courses", path: "/admin/courses", icon: GraduationCap },
     { name: "Questions", path: "/admin/questions", icon: FileQuestion },
     { name: "Reports", path: "/admin/reports", icon: BarChart },
+    { name: "Analysis", path: "/admin/analysis", icon: TrendingUp },
   ];
 
   return (
-    <div className="w-64 h-screen bg-[#f1f5fa] border-r border-slate-200 flex flex-col flex-shrink-0 sticky top-0">
+    <div className={`h-screen bg-[#f1f5fa] flex flex-col flex-shrink-0 sticky top-0 ${className}`}>
       {/* Brand / Logo Area */}
       <div className="px-8 py-8 mb-4">
         <h1 className="text-xl font-extrabold text-[#0a2351] tracking-wide leading-tight">

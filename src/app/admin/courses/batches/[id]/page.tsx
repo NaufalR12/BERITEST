@@ -1,5 +1,5 @@
+import Link from "next/link";
 import { Plus, PlayCircle, Users, Search, Filter, Download, Calendar, Eye, Pencil, Trash2 } from "lucide-react";
-import Header from "@/components/admin/Header";
 
 export default function SessionManagementPage() {
   const dummySessions = [
@@ -39,8 +39,7 @@ export default function SessionManagementPage() {
 
   return (
     <div className="flex flex-col min-h-full pb-10">
-      <Header />
-      
+            
       <div className="flex-1 px-8 pt-8 max-w-7xl mx-auto w-full">
         {/* Page Header Area */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -52,10 +51,10 @@ export default function SessionManagementPage() {
           </div>
           
           <div className="flex items-center">
-            <button className="flex items-center gap-2 px-5 py-2.5 bg-[#0a2351] text-white font-bold text-sm rounded-lg hover:bg-[#0f337a] transition-colors shadow-sm">
+            <Link href="./1/create" className="flex items-center gap-2 px-5 py-2.5 bg-[#0a2351] text-white font-bold text-sm rounded-lg hover:bg-[#0f337a] transition-colors shadow-sm">
               <Plus className="w-4 h-4" />
               Tambah Sesi Baru
-            </button>
+            </Link>
           </div>
         </div>
 

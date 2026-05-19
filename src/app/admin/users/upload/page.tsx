@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, Upload, FileDown, UserPlus } from "lucide-react";
-import Header from "@/components/admin/Header";
+
 
 export default function UploadUsersPage() {
   const dummyPreviewData = [
@@ -13,25 +13,22 @@ export default function UploadUsersPage() {
 
   return (
     <div className="flex flex-col min-h-full pb-10">
-      <Header />
+      
       
       <div className="flex-1 px-8 pt-8 max-w-7xl mx-auto w-full">
+        {/* Breadcrumbs */}
+        <nav className="text-xs font-semibold text-slate-400 mb-2">
+          <Link href="/admin/users" className="hover:text-slate-600 transition-colors">Users</Link>
+          <span className="mx-2 font-normal text-slate-300">&gt;</span>
+          <span className="text-[#5b61f4]">Upload User via Excel</span>
+        </nav>
+
         {/* Page Header Area */}
         <div className="mb-8">
           <h2 className="text-2xl font-extrabold text-[#0a2351] tracking-tight">Upload User via Excel</h2>
           <p className="text-sm text-slate-500 mt-1 font-medium">
             Upload file spreadsheet kandidat untuk pendaftaran massal.
           </p>
-        </div>
-
-        <div className="flex justify-end mb-4">
-          <Link 
-            href="/admin/users" 
-            className="flex items-center gap-2 text-[#0a2351] font-bold text-sm hover:text-blue-700 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Link>
         </div>
 
         {/* Two Column Layout */}

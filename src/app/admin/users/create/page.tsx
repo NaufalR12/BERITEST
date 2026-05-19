@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
-import Header from "@/components/admin/Header";
+
 
 export default function CreateUserPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -22,25 +22,22 @@ export default function CreateUserPage() {
 
   return (
     <div className="flex flex-col min-h-full pb-10">
-      <Header />
+      
       
       <div className="flex-1 px-8 pt-8 max-w-5xl mx-auto w-full">
+        {/* Breadcrumbs */}
+        <nav className="text-xs font-semibold text-slate-400 mb-2">
+          <Link href="/admin/users" className="hover:text-slate-600 transition-colors">Users</Link>
+          <span className="mx-2 font-normal text-slate-300">&gt;</span>
+          <span className="text-[#5b61f4]">Tambah User Baru</span>
+        </nav>
+
         {/* Page Header Area */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-extrabold text-[#0a2351] tracking-tight">Tambah User Baru</h2>
-            <p className="text-sm text-slate-500 mt-1 font-medium">
-              Masukkan detail informasi kandidat untuk membuat akun baru.
-            </p>
-          </div>
-          
-          <Link 
-            href="/admin/users" 
-            className="flex items-center gap-2 text-[#0a2351] font-bold text-sm hover:text-blue-700 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Link>
+        <div className="mb-8">
+          <h2 className="text-2xl font-extrabold text-[#0a2351] tracking-tight">Tambah User Baru</h2>
+          <p className="text-sm text-slate-500 mt-1 font-medium">
+            Masukkan detail informasi kandidat untuk membuat akun baru.
+          </p>
         </div>
 
         {/* Form Card */}

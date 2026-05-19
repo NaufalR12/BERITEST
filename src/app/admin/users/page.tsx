@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { FileUp, UserPlus } from "lucide-react";
-import Header from "@/components/admin/Header";
+
 import UserStats from "@/components/admin/users/UserStats";
 import UserTable from "@/components/admin/users/UserTable";
 
 export default function UsersPage() {
   return (
     <div className="flex flex-col min-h-full pb-10">
-      <Header />
+      
       
       <div className="flex-1 px-8 pt-8 max-w-7xl mx-auto w-full">
         {/* Page Header Area */}

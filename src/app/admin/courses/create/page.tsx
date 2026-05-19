@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Save, Info, BookOpen } from "lucide-react";
-import Header from "@/components/admin/Header";
+
 
 export default function CreateCoursePage() {
   const [title, setTitle] = useState("");
@@ -18,25 +18,22 @@ export default function CreateCoursePage() {
 
   return (
     <div className="flex flex-col min-h-full pb-10">
-      <Header />
+      
       
       <div className="flex-1 px-8 pt-8 max-w-7xl mx-auto w-full">
+        {/* Breadcrumbs */}
+        <nav className="text-xs font-semibold text-slate-400 mb-2">
+          <Link href="/admin/courses" className="hover:text-slate-600 transition-colors">Courses</Link>
+          <span className="mx-2 font-normal text-slate-300">&gt;</span>
+          <span className="text-[#5b61f4]">Tambah Course Baru</span>
+        </nav>
+
         {/* Page Header Area */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-extrabold text-[#0a2351] tracking-tight">Tambah Course Baru</h2>
-            <p className="text-sm text-slate-500 mt-1 font-medium">
-              Buat kurikulum berkualitas tinggi untuk para kandidat.
-            </p>
-          </div>
-          
-          <Link 
-            href="/admin/courses" 
-            className="flex items-center gap-2 text-[#0a2351] font-bold text-sm hover:text-blue-700 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Link>
+        <div className="mb-8">
+          <h2 className="text-2xl font-extrabold text-[#0a2351] tracking-tight">Tambah Course Baru</h2>
+          <p className="text-sm text-slate-500 mt-1 font-medium">
+            Buat kurikulum berkualitas tinggi untuk para kandidat.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit}>
