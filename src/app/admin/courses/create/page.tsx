@@ -2,18 +2,39 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Save, Info, BookOpen } from "lucide-react";
-
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Save, Info, BookOpen, AlertCircle } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function CreateCoursePage() {
+  const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isPublished, setIsPublished] = useState(true);
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Create Course:", { title, description, isPublished });
-    // TODO: integrate with API
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await apiFetch('/courses', {
+        method: 'POST',
+        body: JSON.stringify({
+          course_title: title,
+          description: description,
+          is_active: isPublished,
+        }),
+      });
+
+      router.push('/admin/courses');
+    } catch (err: any) {
+      setError(err.message || "Gagal membuat kursus baru.");
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -22,9 +43,12 @@ export default function CreateCoursePage() {
       
       <div className="flex-1 px-8 pt-8 max-w-7xl mx-auto w-full">
         {/* Breadcrumbs */}
-        <nav className="text-xs font-semibold text-slate-400 mb-2">
-          <Link href="/admin/courses" className="hover:text-slate-600 transition-colors">Courses</Link>
-          <span className="mx-2 font-normal text-slate-300">&gt;</span>
+        <nav className="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-2">
+          <Link href="/admin/courses" className="hover:text-slate-600 transition-colors flex items-center gap-1">
+            <ArrowLeft className="w-3 h-3" />
+            Kembali
+          </Link>
+          <span className="font-normal text-slate-300">|</span>
           <span className="text-[#5b61f4]">Tambah Course Baru</span>
         </nav>
 
@@ -35,6 +59,13 @@ export default function CreateCoursePage() {
             Buat kurikulum berkualitas tinggi untuk para kandidat.
           </p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 text-sm">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <p className="font-semibold">{error}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           {/* Two Column Layout */}
@@ -138,10 +169,15 @@ export default function CreateCoursePage() {
             </Link>
             <button
               type="submit"
-              className="flex items-center gap-2 px-6 py-2.5 bg-[#0a2351] hover:bg-[#0f337a] text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+              disabled={isLoading}
+              className="flex items-center gap-2 px-6 py-2.5 bg-[#0a2351] hover:bg-[#0f337a] disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
             >
-              <Save className="w-4 h-4" />
-              Simpan Kursus
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              {isLoading ? "Menyimpan..." : "Simpan Kursus"}
             </button>
           </div>
         </form>
@@ -149,3 +185,4 @@ export default function CreateCoursePage() {
     </div>
   );
 }
+
