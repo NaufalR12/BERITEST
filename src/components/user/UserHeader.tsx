@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, User, Settings, ChevronDown } from "lucide-react";
+import { logout } from "@/lib/api";
 
 interface UserHeaderProps {
   activeTab: "Course" | "Schedule";
@@ -12,7 +13,16 @@ interface UserHeaderProps {
 export default function UserHeader({ activeTab }: UserHeaderProps) {
   const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Load user data
+  useEffect(() => {
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -29,8 +39,7 @@ export default function UserHeader({ activeTab }: UserHeaderProps) {
 
   const handleLogout = () => {
     setIsDropdownOpen(false);
-    // Perform logout redirect
-    router.push("/login");
+    logout();
   };
 
   return (
@@ -87,8 +96,8 @@ export default function UserHeader({ activeTab }: UserHeaderProps) {
           <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-lg py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
             {/* User Details */}
             <div className="px-4 py-2 border-b border-slate-100">
-              <p className="text-xs font-bold text-[#1a365d] tracking-wide uppercase">Peserta</p>
-              <p className="text-sm font-semibold text-slate-800 truncate">peserta@beritest.com</p>
+              <p className="text-xs font-bold text-[#1a365d] tracking-wide uppercase">{user?.role || 'Peserta'}</p>
+              <p className="text-sm font-semibold text-slate-800 truncate">{user?.email || 'email@beritest.com'}</p>
             </div>
             
             {/* Menu Items */}

@@ -1,5 +1,8 @@
-import { Menu, Search, Bell } from "lucide-react";
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import { Menu, LogOut } from "lucide-react";
+import { logout } from "@/lib/api";
 
 interface HeaderProps {
   isSidebarOpen?: boolean;
@@ -7,6 +10,15 @@ interface HeaderProps {
 }
 
 export default function Header({ isSidebarOpen = true, toggleSidebar }: HeaderProps) {
+  const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
+
+  useEffect(() => {
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  }, []);
+
   return (
     <header className="w-full bg-white border-b border-slate-200 py-3 px-6 flex justify-between items-center z-10 sticky top-0">
       
@@ -26,13 +38,15 @@ export default function Header({ isSidebarOpen = true, toggleSidebar }: HeaderPr
         </h1>
       </div>
 
-      {/* Right Area: Profile */}
-      <div className="flex items-center gap-4">
+      {/* Right Area: Profile & Logout */}
+      <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-slate-800 leading-tight">Administrator</p>
+            <p className="text-sm font-bold text-slate-800 leading-tight">
+              {user?.name || "Administrator"}
+            </p>
             <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">
-              Super Admin
+              {user?.role || "Super Admin"}
             </p>
           </div>
           <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 shrink-0 bg-slate-100 flex items-center justify-center text-slate-400">

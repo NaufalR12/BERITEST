@@ -2,31 +2,59 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Lock } from "lucide-react";
+import { Mail, Lock, AlertCircle } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Mock API call to be integrated with backend later
-    setTimeout(() => {
-      setIsLoading(false);
-      console.log("Login with:", email, password);
-      if (email.toLowerCase().includes("admin")) {
+    setError(null);
+
+    try {
+      const response = await apiFetch('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+
+      console.log("Login success:", response);
+      
+      // Store token and user data
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      
+      // Store token in cookie for middleware access
+      document.cookie = `token=${response.token}; path=/; max-age=43200; SameSite=Lax`; // 12 hours
+
+      // Redirect based on role
+      if (response.user.role === 'Admin') {
         router.push("/admin/users");
       } else {
         router.push("/user");
       }
-    }, 1000);
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      setError(err.message || "Gagal masuk. Silakan periksa kembali email dan kata sandi Anda.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-600 text-sm">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
+
       <div className="mb-5">
         <label htmlFor="email" className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">
           Alamat Email
