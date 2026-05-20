@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Mail, Lock } from "lucide-react";
 
 export default function LoginForm() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -15,7 +17,12 @@ export default function LoginForm() {
     setTimeout(() => {
       setIsLoading(false);
       console.log("Login with:", email, password);
-    }, 1500);
+      if (email.toLowerCase().includes("admin")) {
+        router.push("/admin/users");
+      } else {
+        router.push("/user");
+      }
+    }, 1000);
   };
 
   return (
