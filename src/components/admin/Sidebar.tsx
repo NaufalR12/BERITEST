@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Users, GraduationCap, FileQuestion, BarChart, LogOut, TrendingUp } from "lucide-react";
+import { logout } from "@/lib/api";
 
 export default function Sidebar({ className = "" }: { className?: string }) {
   const pathname = usePathname();
@@ -48,7 +49,10 @@ export default function Sidebar({ className = "" }: { className?: string }) {
 
       {/* Footer / Logout */}
       <div className="p-4 border-t border-slate-200">
-        <button className="flex items-center gap-3 px-4 py-3 w-full text-slate-600 hover:bg-slate-200/50 hover:text-red-600 rounded-lg text-sm font-semibold transition-colors">
+        <button 
+          onClick={() => logout()}
+          className="flex items-center gap-3 px-4 py-3 w-full text-slate-600 hover:bg-slate-200/50 hover:text-red-600 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+        >
           <LogOut className="w-5 h-5" />
           Logout
         </button>
