@@ -1,55 +1,135 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Info, Clock, CheckSquare, Users, Lock, X, UserPlus, Circle, CheckCircle2 } from "lucide-react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, Info, Clock, CheckSquare, Users, Lock, X, UserPlus, Circle, CheckCircle2, AlertCircle } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
-// Mock data for question groups
+// Mock data for question groups (Since Question Group API is not yet available)
 const questionGroups = [
   {
-    id: "qg1",
+    id: 1,
     name: "Standard Logic G1",
     details: "45 Questions • 60 Mins",
     badges: ["Logical", "Pattern"],
   },
   {
-    id: "qg2",
+    id: 2,
     name: "Advanced Tech Stack B",
     details: "30 Questions • 90 Mins",
     badges: ["Architecture", "Coding"],
   },
   {
-    id: "qg3",
+    id: 3,
     name: "Managerial Psychometric",
     details: "60 Questions • 45 Mins",
     badges: ["Behavioral"],
   },
 ];
 
-// Mock data for participants
-const initialParticipants = [
-  { id: "p1", name: "Michael Chen", detail: "Engineering Batch" },
-  { id: "p2", name: "Sarah Jenkins", detail: "Senior Ops" },
-  { id: "p3", name: "David Miller", detail: "Tech Leads" },
-];
-
 export default function CreateSessionPage() {
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const batchId = params.id as string;
+  const courseIdParam = searchParams.get("courseId");
+
   const [sessionName, setSessionName] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState("qg2"); // Pre-select the second one based on image
-  const [participants, setParticipants] = useState(initialParticipants);
+  const [selectedGroup, setSelectedGroup] = useState<number>(2); // Default mock group ID
+  
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [batchParticipants, setBatchParticipants] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
 
-  const handleRemoveParticipant = (id: string) => {
-    setParticipants(participants.filter(p => p.id !== id));
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        if (batchId) {
+          const batchRes = await apiFetch(`/batches/${batchId}`);
+          
+          // Get users who are in this batch to be used for search dropdown only
+          const usersInBatch = batchRes.data.trn_batch_user?.map((p: any) => p.mst_users) || [];
+          setBatchParticipants(usersInBatch);
+          
+          if (!sessionName) {
+             setSessionName(`Sesi Ujian - ${batchRes.data.nama_batch}`);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch data", err);
+      }
+    };
+    fetchData();
+  }, [batchId]);
+
+  const searchResults = batchParticipants.filter(
+    (user) =>
+      ((user.nama_user || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (user.email || "").toLowerCase().includes(searchQuery.toLowerCase())) &&
+      !participants.some((selected) => selected.id_user === user.id_user)
+  );
+
+  const handleSelectUser = (user: any) => {
+    setParticipants([...participants, user]);
+    setSearchQuery(""); 
+    setShowDropdown(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleRemoveParticipant = (id: string) => {
+    setParticipants(participants.filter(p => p.id_user !== id));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Create Session:", { sessionName, description, startDate, endDate, selectedGroup, participants });
-    // TODO: Submit to API
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      if (!courseIdParam) {
+        throw new Error("Course ID is missing. Cannot create a session without linking it to a course.");
+      }
+
+      const isoStartDate = new Date(startDate).toISOString();
+      const isoEndDate = new Date(endDate).toISOString();
+
+      // Duration logic (mock calculation)
+      const start = new Date(startDate).getTime();
+      const end = new Date(endDate).getTime();
+      const durationMinutes = Math.round((end - start) / 60000);
+
+      const participantIds = participants.map(p => p.id_user);
+
+      const payload = {
+        session_name: sessionName,
+        description: description,
+        id_course: parseInt(courseIdParam, 10),
+        start_time: isoStartDate,
+        end_time: isoEndDate,
+        duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
+        passing_score: 70, // Default passing score
+        status: "Upcoming",
+        question_group_ids: [selectedGroup], // Map to selected mock group
+        participant_user_ids: participantIds
+      };
+
+      await apiFetch("/test-sessions", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      router.push(`/admin/courses/batches/${batchId}`);
+    } catch (err: any) {
+      setError(err.message || "Gagal membuat sesi ujian.");
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -57,11 +137,13 @@ export default function CreateSessionPage() {
             
       <div className="flex-1 px-8 pt-8 max-w-6xl mx-auto w-full">
         {/* Breadcrumbs */}
-        <nav className="text-xs font-semibold text-slate-400 mb-2">
+        <nav className="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-2">
           <Link href="/admin/courses" className="hover:text-slate-600 transition-colors">Courses</Link>
-          <span className="mx-2 font-normal text-slate-300">&gt;</span>
+          <span className="font-normal text-slate-300">&gt;</span>
           <Link href="/admin/courses/batches" className="hover:text-slate-600 transition-colors">Batches</Link>
-          <span className="mx-2 font-normal text-slate-300">&gt;</span>
+          <span className="font-normal text-slate-300">&gt;</span>
+          <Link href={`/admin/courses/batches/${batchId}`} className="hover:text-slate-600 transition-colors">Detail</Link>
+          <span className="font-normal text-slate-300">&gt;</span>
           <span className="text-[#5b61f4]">Tambah Session Baru</span>
         </nav>
 
@@ -69,9 +151,16 @@ export default function CreateSessionPage() {
         <div className="mb-8">
           <h2 className="text-2xl font-extrabold text-[#0a2351] tracking-tight">Tambah Session Baru</h2>
           <p className="text-sm text-slate-500 mt-1 font-medium">
-            Set up a new session for batch.
+            Set up a new assessment session for this batch.
           </p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 text-sm">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <p className="font-semibold">{error}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
@@ -168,7 +257,7 @@ export default function CreateSessionPage() {
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-6">
               <CheckSquare className="w-4 h-4 text-[#0a2351]" />
-              <h3 className="text-xs font-bold text-[#0a2351] tracking-wider uppercase">QUESTION GROUP SELECTION</h3>
+              <h3 className="text-xs font-bold text-[#0a2351] tracking-wider uppercase">QUESTION GROUP SELECTION (Mock Data)</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -223,16 +312,8 @@ export default function CreateSessionPage() {
                   <Users className="w-4 h-4 text-[#0a2351]" />
                   <h3 className="text-xs font-bold text-[#0a2351] tracking-wider uppercase">PARTICIPANT ASSIGNMENT</h3>
                 </div>
-                <p className="text-xs text-slate-500 font-medium">Select users individually or import by batch tags.</p>
+                <p className="text-xs text-slate-500 font-medium">Secara default kosong. Silakan cari dan pilih peserta dari daftar anggota batch.</p>
               </div>
-              
-              <button 
-                type="button"
-                className="flex items-center gap-2 bg-[#0a2351] text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-[#0f337a] transition-colors shadow-sm"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                Select Users
-              </button>
             </div>
 
             <div className="bg-[#f8fafc] border border-slate-200 rounded-xl p-5 min-h-[120px] flex flex-col gap-4">
@@ -240,16 +321,16 @@ export default function CreateSessionPage() {
               {participants.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {participants.map((p) => (
-                    <div key={p.id} className="flex items-center gap-2 bg-[#eef2ff] border border-[#c7d2fe] px-2 py-1.5 rounded-full shadow-sm">
+                    <div key={p.id_user} className="flex items-center gap-2 bg-[#eef2ff] border border-[#c7d2fe] px-2 py-1.5 rounded-full shadow-sm">
                       <div className="w-5 h-5 rounded-full bg-[#0a2351] flex items-center justify-center text-white text-[9px] font-bold">
-                        {p.name.charAt(0)}
+                        {p.nama_user?.charAt(0) || "U"}
                       </div>
                       <span className="text-[11px] font-bold text-[#0a2351]">
-                        {p.name} <span className="text-[#5b61f4] font-medium">({p.detail})</span>
+                        {p.nama_user}
                       </span>
                       <button 
                         type="button" 
-                        onClick={() => handleRemoveParticipant(p.id)}
+                        onClick={() => handleRemoveParticipant(p.id_user)}
                         className="text-[#5b61f4] hover:text-red-500 transition-colors ml-1"
                       >
                         <X className="w-3 h-3" />
@@ -259,30 +340,57 @@ export default function CreateSessionPage() {
                 </div>
               )}
 
-              {/* Search Input (Mock) */}
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Type name to search..."
-                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 mt-auto"
-              />
+              {/* Search Input */}
+              <div className="relative mt-auto pt-4 border-t border-slate-200">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                  placeholder="Cari nama atau email pengguna dari batch ini..."
+                  className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                 {showDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {searchResults.length > 0 ? (
+                      searchResults.map((user) => (
+                        <button
+                          key={user.id_user}
+                          type="button"
+                          onClick={() => handleSelectUser(user)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                        >
+                          <p className="text-sm font-bold text-slate-800">{user.nama_user}</p>
+                          <p className="text-xs text-slate-500">{user.email || "Tidak ada email"}</p>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                        Semua pengguna di batch ini sudah terpilih atau tidak ditemukan.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Footer Actions */}
           <div className="pt-6 border-t border-slate-200 flex items-center justify-end gap-4">
             <Link
-              href="../1"
+              href={`/admin/courses/batches/${batchId}`}
               className="px-6 py-2.5 text-slate-600 text-sm font-bold rounded-lg hover:bg-slate-50 transition-colors"
             >
               Cancel
             </Link>
             <button
               type="submit"
-              className="px-8 py-2.5 bg-[#0a2351] hover:bg-[#0f337a] text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+              disabled={isLoading}
+              className="flex items-center gap-2 px-8 py-2.5 bg-[#0a2351] hover:bg-[#0f337a] disabled:bg-slate-300 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
             >
-              Save Session
+              {isLoading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+              {isLoading ? "Menyimpan..." : "Save Session"}
             </button>
           </div>
 
@@ -291,3 +399,4 @@ export default function CreateSessionPage() {
     </div>
   );
 }
+

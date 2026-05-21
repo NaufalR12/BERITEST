@@ -1,54 +1,107 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Search, X, Users, Eye, EyeOff } from "lucide-react";
-
-
-// Mock data for search
-const allUsers = [
-  { id: "u1", name: "Ahmad Faisal", email: "ahmad.faisal@email.com" },
-  { id: "u2", name: "Budi Santoso", email: "budi.s@provider.net" },
-  { id: "u3", name: "Citra Lestari", email: "citra.lestari@company.id" },
-  { id: "u4", name: "Dian Rostia", email: "dian_rostia@beritest.com" },
-];
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Search, X, Users, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function CreateBatchPage() {
+  const router = useRouter();
+
   // Form State
   const [batchName, setBatchName] = useState("");
-  const [course, setCourse] = useState("");
+  const [courseId, setCourseId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [visibility, setVisibility] = useState("Public");
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState(""); // UI element only, backend doesn't save it
+
+  // Data State
+  const [courses, setCourses] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Search & Enroll State
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedUsers, setSelectedUsers] = useState<typeof allUsers>([
-    { id: "u1", name: "Ahmad Faisal", email: "ahmad.faisal@email.com" },
-  ]); // Start with one selected for demo purposes
+  const [selectedUsers, setSelectedUsers] = useState<any[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [courseRes, userRes] = await Promise.all([
+          apiFetch("/courses?limit=100"),
+          apiFetch("/users?limit=1000&search=")
+        ]);
+        setCourses(courseRes.data);
+        setAllUsers(userRes.data);
+      } catch (err) {
+        console.error("Failed to load initial data", err);
+      }
+    };
+    fetchData();
+  }, []);
 
   // Filter users based on search (excluding already selected)
   const searchResults = allUsers.filter(
     (user) =>
-      (user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase())) &&
-      !selectedUsers.some((selected) => selected.id === user.id)
+      ((user.nama_user || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (user.email || "").toLowerCase().includes(searchQuery.toLowerCase())) &&
+      !selectedUsers.some((selected) => selected.id_user === user.id_user)
   );
 
-  const handleSelectUser = (user: typeof allUsers[0]) => {
+  const handleSelectUser = (user: any) => {
     setSelectedUsers([...selectedUsers, user]);
     setSearchQuery(""); // clear search
+    setShowDropdown(false);
   };
 
   const handleRemoveUser = (userId: string) => {
-    setSelectedUsers(selectedUsers.filter((user) => user.id !== userId));
+    setSelectedUsers(selectedUsers.filter((user) => user.id_user !== userId));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Create Batch:", { batchName, course, startDate, endDate, visibility, description, enrolledUsers: selectedUsers });
-    // TODO: integrate with API
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // 1. Create the Batch
+      // Backend expects strict ISO 8601 DateTime. Type 'date' gives 'YYYY-MM-DD'.
+      const isoStartDate = new Date(startDate).toISOString();
+      const isoEndDate = new Date(endDate).toISOString();
+
+      const batchPayload = {
+        id_course: parseInt(courseId, 10),
+        nama_batch: batchName,
+        start_date: isoStartDate,
+        end_date: isoEndDate,
+        is_active: visibility === "Public",
+      };
+
+      const batchResponse = await apiFetch("/batches", {
+        method: "POST",
+        body: JSON.stringify(batchPayload),
+      });
+
+      const newBatchId = batchResponse.data.id_batch;
+
+      // 2. Assign Users (if any)
+      if (selectedUsers.length > 0) {
+        const userIds = selectedUsers.map(u => u.id_user);
+        await apiFetch(`/batches/${newBatchId}/assign-users`, {
+          method: "POST",
+          body: JSON.stringify({ user_ids: userIds }),
+        });
+      }
+
+      router.push("/admin/courses/batches");
+    } catch (err: any) {
+      setError(err.message || "Gagal membuat batch. Pastikan semua form terisi dengan benar.");
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -72,6 +125,13 @@ export default function CreateBatchPage() {
             Set up a new assessment group for candidates.
           </p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 text-sm">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <p className="font-semibold">{error}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-xl shadow-sm p-8">
           
@@ -99,15 +159,17 @@ export default function CreateBatchPage() {
               </label>
               <select
                 id="course"
-                value={course}
-                onChange={(e) => setCourse(e.target.value)}
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
                 className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-slate-700"
                 required
               >
                 <option value="" disabled>Select a course</option>
-                <option value="course-1">Professional Cloud Architect</option>
-                <option value="course-2">User Experience Fundamentals</option>
-                <option value="course-3">Advanced Data Analytics</option>
+                {courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.course_title}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -194,7 +256,7 @@ export default function CreateBatchPage() {
           <hr className="border-slate-100 my-8" />
 
           {/* Enroll Users Section (New Feature) */}
-          <div className="mb-8">
+          <div className="mb-8 relative">
             <div className="flex items-center gap-2 mb-4">
               <Users className="w-5 h-5 text-[#0a2351]" />
               <h3 className="text-sm font-bold text-slate-800">Enroll Participants (Optional)</h3>
@@ -208,24 +270,31 @@ export default function CreateBatchPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari nama atau email pengguna untuk ditambahkan..."
-                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors shadow-sm"
+                onFocus={() => setShowDropdown(true)}
+                placeholder="Klik di sini atau cari nama/email pengguna..."
+                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors shadow-sm cursor-pointer"
               />
               
               {/* Search Dropdown Results */}
-              {searchQuery && searchResults.length > 0 && (
+              {showDropdown && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {searchResults.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => handleSelectUser(user)}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0"
-                    >
-                      <p className="text-sm font-bold text-slate-800">{user.name}</p>
-                      <p className="text-xs text-slate-500">{user.email}</p>
-                    </button>
-                  ))}
+                  {searchResults.length > 0 ? (
+                    searchResults.map((user) => (
+                      <button
+                        key={user.id_user}
+                        type="button"
+                        onClick={() => handleSelectUser(user)}
+                        className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                      >
+                        <p className="text-sm font-bold text-slate-800">{user.nama_user}</p>
+                        <p className="text-xs text-slate-500">{user.email || "Tidak ada email"}</p>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                      Semua pengguna sudah terpilih atau tidak ditemukan.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -236,11 +305,11 @@ export default function CreateBatchPage() {
                 <p className="text-xs font-bold text-slate-500 mb-3">PENGGUNA TERPILIH ({selectedUsers.length})</p>
                 <div className="flex flex-wrap gap-2">
                   {selectedUsers.map((user) => (
-                    <div key={user.id} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-sm">
-                      <span className="text-xs font-semibold text-slate-700">{user.name}</span>
+                    <div key={user.id_user} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-sm">
+                      <span className="text-xs font-semibold text-slate-700">{user.nama_user}</span>
                       <button 
                         type="button" 
-                        onClick={() => handleRemoveUser(user.id)}
+                        onClick={() => handleRemoveUser(user.id_user)}
                         className="text-slate-400 hover:text-red-500 transition-colors"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -264,9 +333,11 @@ export default function CreateBatchPage() {
             </Link>
             <button
               type="submit"
-              className="px-8 py-2.5 bg-[#0a2351] hover:bg-[#0f337a] text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+              disabled={isLoading}
+              className="px-8 py-2.5 bg-[#0a2351] hover:bg-[#0f337a] disabled:bg-slate-300 text-white text-sm font-bold rounded-lg transition-colors shadow-sm flex items-center gap-2"
             >
-              Save Batch
+              {isLoading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+              {isLoading ? "Menyimpan..." : "Save Batch"}
             </button>
           </div>
         </form>
@@ -274,3 +345,5 @@ export default function CreateBatchPage() {
     </div>
   );
 }
+
+
