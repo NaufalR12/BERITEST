@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, GraduationCap, FileQuestion, BarChart, LogOut, TrendingUp } from "lucide-react";
+import { Users, GraduationCap, FileQuestion, BarChart, LogOut, TrendingUp, MapPin } from "lucide-react";
 import { logout } from "@/lib/api";
 
 export default function Sidebar({ className = "" }: { className?: string }) {
@@ -12,6 +12,7 @@ export default function Sidebar({ className = "" }: { className?: string }) {
     { name: "Users", path: "/admin/users", icon: Users },
     { name: "Courses", path: "/admin/courses", icon: GraduationCap },
     { name: "Questions", path: "/admin/questions", icon: FileQuestion },
+    { name: "Positions", path: "/admin/positions", icon: MapPin },
     { name: "Reports", path: "/admin/reports", icon: BarChart },
     { name: "Analysis", path: "/admin/analysis", icon: TrendingUp },
   ];

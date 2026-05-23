@@ -6,27 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Info, Clock, CheckSquare, Users, Lock, X, UserPlus, Circle, CheckCircle2, AlertCircle } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
-// Mock data for question groups (Since Question Group API is not yet available)
-const questionGroups = [
-  {
-    id: 1,
-    name: "Standard Logic G1",
-    details: "45 Questions • 60 Mins",
-    badges: ["Logical", "Pattern"],
-  },
-  {
-    id: 2,
-    name: "Advanced Tech Stack B",
-    details: "30 Questions • 90 Mins",
-    badges: ["Architecture", "Coding"],
-  },
-  {
-    id: 3,
-    name: "Managerial Psychometric",
-    details: "60 Questions • 45 Mins",
-    badges: ["Behavioral"],
-  },
-];
+import { getQuestionGroups } from "@/lib/questionGroupApi";
 
 export default function CreateSessionPage() {
   const params = useParams();
@@ -39,8 +19,8 @@ export default function CreateSessionPage() {
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState<number>(2); // Default mock group ID
-  
+  const [questionGroups, setQuestionGroups] = useState<any[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<number[]>([]); 
   const [participants, setParticipants] = useState<any[]>([]);
   const [batchParticipants, setBatchParticipants] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,6 +43,10 @@ export default function CreateSessionPage() {
              setSessionName(`Sesi Ujian - ${batchRes.data.nama_batch}`);
           }
         }
+        
+        // Fetch Question Groups
+        const groupsRes = await getQuestionGroups({ limit: 100 });
+        setQuestionGroups(groupsRes.data || []);
       } catch (err) {
         console.error("Failed to fetch data", err);
       }
@@ -116,7 +100,7 @@ export default function CreateSessionPage() {
         duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
         passing_score: 70, // Default passing score
         status: "Upcoming",
-        question_group_ids: [selectedGroup], // Map to selected mock group
+        question_group_ids: selectedGroups,
         participant_user_ids: participantIds
       };
 
@@ -257,51 +241,51 @@ export default function CreateSessionPage() {
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-6">
               <CheckSquare className="w-4 h-4 text-[#0a2351]" />
-              <h3 className="text-xs font-bold text-[#0a2351] tracking-wider uppercase">QUESTION GROUP SELECTION (Mock Data)</h3>
+              <h3 className="text-xs font-bold text-[#0a2351] tracking-wider uppercase">QUESTION GROUP SELECTION</h3>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {questionGroups.map((group) => {
-                const isSelected = selectedGroup === group.id;
-                return (
-                  <div
-                    key={group.id}
-                    onClick={() => setSelectedGroup(group.id)}
-                    className={`relative cursor-pointer rounded-xl border p-5 transition-all ${
-                      isSelected 
-                        ? "border-[#0a2351] bg-[#f8fafc] ring-1 ring-[#0a2351]" 
-                        : "border-slate-200 bg-white hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className={`font-bold text-sm ${isSelected ? "text-[#0a2351]" : "text-slate-800"}`}>
-                        {group.name}
-                      </h4>
-                      {isSelected ? (
-                        <CheckCircle2 className="w-5 h-5 text-[#0a2351]" />
-                      ) : (
-                        <Circle className="w-5 h-5 text-slate-300" />
-                      )}
+            {questionGroups.length === 0 ? (
+              <div className="text-center text-slate-500 text-sm py-4">Belum ada grup soal yang tersedia.</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {questionGroups.map((group) => {
+                  const isSelected = selectedGroups.includes(group.id_group);
+                  return (
+                    <div
+                      key={group.id_group}
+                      onClick={() => {
+                        setSelectedGroups((prev) => 
+                          prev.includes(group.id_group) 
+                            ? prev.filter(id => id !== group.id_group) 
+                            : [...prev, group.id_group]
+                        );
+                      }}
+                      className={`relative cursor-pointer rounded-xl border p-5 transition-all flex flex-col ${
+                        isSelected 
+                          ? "border-[#0a2351] bg-[#f8fafc] ring-1 ring-[#0a2351]" 
+                          : "border-slate-200 bg-white hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className={`font-bold text-sm ${isSelected ? "text-[#0a2351]" : "text-slate-800"}`}>
+                          {group.group_name}
+                        </h4>
+                        {isSelected ? (
+                          <CheckCircle2 className="w-5 h-5 text-[#0a2351] shrink-0" />
+                        ) : (
+                          <Circle className="w-5 h-5 text-slate-300 shrink-0" />
+                        )}
+                      </div>
+                      
+                      <p className="text-xs font-medium text-slate-500 mb-4 flex-1">
+                        {group.description || "Tanpa deskripsi"}
+                      </p>
+                      
                     </div>
-                    
-                    <p className="text-xs font-medium text-slate-500 mb-4">{group.details}</p>
-                    
-                    <div className="flex flex-wrap gap-2 mt-auto">
-                      {group.badges.map((badge, idx) => (
-                        <span 
-                          key={idx} 
-                          className={`text-[10px] px-2 py-1 rounded font-bold ${
-                            isSelected ? "bg-[#eef2ff] text-[#5b61f4]" : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {badge}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Bottom Row: PARTICIPANT ASSIGNMENT */}

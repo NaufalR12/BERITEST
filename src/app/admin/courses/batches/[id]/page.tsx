@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Plus, PlayCircle, Users, Search, Filter, Download, Calendar, Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, PlayCircle, Users, Search, Filter, Download, Calendar, Eye, Pencil, Trash2, FolderPlus, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { getQuestionGroups } from "@/lib/questionGroupApi";
 
 export default function SessionManagementPage() {
   const params = useParams();
@@ -17,6 +18,18 @@ export default function SessionManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({ active_sessions: 0, total_participants: 0 });
+
+  // Modal State
+  const [isAssignGroupOpen, setIsAssignGroupOpen] = useState(false);
+  const [selectedSessionForGroup, setSelectedSessionForGroup] = useState<any>(null);
+  const [questionGroups, setQuestionGroups] = useState<any[]>([]);
+  const [assignedGroupIds, setAssignedGroupIds] = useState<number[]>([]);
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  // Edit Modal State
+  const [isEditSessionOpen, setIsEditSessionOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const fetchBatchAndSessions = async () => {
@@ -84,6 +97,107 @@ export default function SessionManagementPage() {
       month: 'short', day: 'numeric', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     }).format(date);
+  };
+
+  const openAssignGroupModal = async (session: any) => {
+    setSelectedSessionForGroup(session);
+    setIsAssignGroupOpen(true);
+    setAssignedGroupIds([]);
+    try {
+      const groupsRes = await getQuestionGroups({ limit: 100 });
+      setQuestionGroups(groupsRes.data || []);
+
+      const sessionRes = await apiFetch(`/test-sessions/${session.id_session}`);
+      const sessionDetail = sessionRes.data;
+      const assigned = sessionDetail.trn_session_question_group?.map((g: any) => g.id_question_group) || [];
+      setAssignedGroupIds(assigned);
+    } catch (error: any) {
+      alert("Gagal memuat data: " + error.message);
+    }
+  };
+
+  const closeAssignGroupModal = () => {
+    setIsAssignGroupOpen(false);
+    setSelectedSessionForGroup(null);
+  };
+
+  const handleToggleGroup = (groupId: number) => {
+    setAssignedGroupIds((prev) => 
+      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
+    );
+  };
+
+  const handleSaveAssignedGroups = async () => {
+    if (!selectedSessionForGroup) return;
+    setIsAssigning(true);
+    try {
+      await apiFetch(`/test-sessions/${selectedSessionForGroup.id_session}/assign-groups`, {
+        method: 'POST',
+        body: JSON.stringify({ question_group_ids: assignedGroupIds })
+      });
+      alert("Berhasil menyimpan pengaturan soal untuk sesi ini!");
+      closeAssignGroupModal();
+    } catch (error: any) {
+      alert(error.message || "Gagal menyimpan pengaturan soal");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const formatForInput = (dateString: string) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const yyyy = date.getFullYear();
+    const MM = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    const hh = String(date.getHours()).padStart(2, "0");
+    const mm = String(date.getMinutes()).padStart(2, "0");
+    return `${yyyy}-${MM}-${dd}T${hh}:${mm}`;
+  };
+
+  const openEditSessionModal = (session: any) => {
+    setEditingSession({
+      ...session,
+      start_time: formatForInput(session.start_time),
+      end_time: formatForInput(session.end_time),
+    });
+    setIsEditSessionOpen(true);
+  };
+
+  const closeEditSessionModal = () => {
+    setIsEditSessionOpen(false);
+    setEditingSession(null);
+  };
+
+  const handleEditSessionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSession) return;
+    setIsEditing(true);
+    try {
+      const payload = {
+        session_name: editingSession.session_name,
+        description: editingSession.description,
+        start_time: new Date(editingSession.start_time).toISOString(),
+        end_time: new Date(editingSession.end_time).toISOString(),
+        status: editingSession.status,
+      };
+      await apiFetch(`/test-sessions/${editingSession.id_session}`, {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      });
+      alert("Berhasil menyimpan perubahan sesi!");
+      closeEditSessionModal();
+      
+      const courseId = batchDetail?.id_course;
+      if (courseId) {
+        const sessionRes = await apiFetch(`/test-sessions?id_course=${courseId}&page=${meta.page}&limit=10&search=${searchQuery}`);
+        setSessions(sessionRes.data);
+      }
+    } catch (error: any) {
+      alert(error.message || "Gagal mengupdate sesi");
+    } finally {
+      setIsEditing(false);
+    }
   };
 
   return (
@@ -235,10 +349,19 @@ export default function SessionManagementPage() {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => openAssignGroupModal(session)}
+                            className="text-[#5b61f4] hover:text-blue-700 transition-colors p-1" title="Assign Question Groups"
+                          >
+                            <FolderPlus className="w-4 h-4" />
+                          </button>
                           <button className="text-[#0a2351] hover:text-blue-600 transition-colors p-1" title="Lihat">
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button className="text-slate-400 hover:text-[#0a2351] transition-colors p-1" title="Edit">
+                          <button 
+                            onClick={() => openEditSessionModal(session)}
+                            className="text-slate-400 hover:text-[#0a2351] transition-colors p-1" title="Edit"
+                          >
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button 
@@ -281,6 +404,168 @@ export default function SessionManagementPage() {
 
         </div>
       </div>
+
+      {/* Assign Question Groups Modal */}
+      {isAssignGroupOpen && selectedSessionForGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div>
+                <h3 className="text-lg font-extrabold text-[#0a2351]">Assign Question Groups</h3>
+                <p className="text-xs text-slate-500 font-medium">Session: {selectedSessionForGroup.session_name}</p>
+              </div>
+              <button onClick={closeAssignGroupModal} className="text-slate-400 hover:text-slate-700 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              {questionGroups.length === 0 ? (
+                <div className="text-center text-slate-500 text-sm py-4">Belum ada grup soal yang tersedia.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {questionGroups.map((group) => (
+                    <label 
+                      key={group.id_group}
+                      className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
+                        assignedGroupIds.includes(group.id_group) 
+                          ? 'border-[#5b61f4] bg-blue-50/30' 
+                          : 'border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input 
+                        type="checkbox" 
+                        className="mt-1 w-4 h-4 text-[#5b61f4] rounded border-slate-300 focus:ring-[#5b61f4]"
+                        checked={assignedGroupIds.includes(group.id_group)}
+                        onChange={() => handleToggleGroup(group.id_group)}
+                      />
+                      <div>
+                        <p className="text-sm font-extrabold text-[#0a2351]">{group.group_name}</p>
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5 truncate max-w-[200px]">
+                          {group.description || "Tanpa deskripsi"}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3 shrink-0">
+              <button 
+                type="button" 
+                onClick={closeAssignGroupModal}
+                className="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-bold rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                type="button" 
+                onClick={handleSaveAssignedGroups}
+                disabled={isAssigning}
+                className="px-6 py-2 bg-[#0a2351] hover:bg-[#0f337a] text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-60"
+              >
+                {isAssigning && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {isAssigning ? "Menyimpan..." : "Simpan Pilihan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Session Modal */}
+      {isEditSessionOpen && editingSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <h3 className="text-lg font-extrabold text-[#0a2351]">Edit Sesi Ujian</h3>
+              <button onClick={closeEditSessionModal} className="text-slate-400 hover:text-slate-700 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[70vh]">
+              <form id="editSessionForm" onSubmit={handleEditSessionSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nama Sesi</label>
+                  <input
+                    type="text"
+                    value={editingSession.session_name || ""}
+                    onChange={(e) => setEditingSession({ ...editingSession, session_name: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Deskripsi</label>
+                  <textarea
+                    value={editingSession.description || ""}
+                    onChange={(e) => setEditingSession({ ...editingSession, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors min-h-[80px]"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Waktu Mulai</label>
+                    <input
+                      type="datetime-local"
+                      value={editingSession.start_time}
+                      onChange={(e) => setEditingSession({ ...editingSession, start_time: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Waktu Selesai</label>
+                    <input
+                      type="datetime-local"
+                      value={editingSession.end_time}
+                      onChange={(e) => setEditingSession({ ...editingSession, end_time: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Status Override (Opsional)</label>
+                  <select
+                    value={editingSession.status}
+                    onChange={(e) => setEditingSession({ ...editingSession, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                  >
+                    <option value="Upcoming">Upcoming</option>
+                    <option value="Active">Active</option>
+                    <option value="Ongoing">Ongoing</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">Status akan diubah otomatis berdasarkan waktu, namun Anda bisa menimpanya di sini.</p>
+                </div>
+              </form>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
+              <button 
+                type="button" 
+                onClick={closeEditSessionModal}
+                className="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-bold rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                type="submit" 
+                form="editSessionForm"
+                disabled={isEditing}
+                className="px-6 py-2 bg-[#0a2351] hover:bg-[#0f337a] text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-60"
+              >
+                {isEditing && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {isEditing ? "Menyimpan..." : "Simpan Perubahan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
