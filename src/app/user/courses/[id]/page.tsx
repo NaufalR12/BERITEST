@@ -37,12 +37,19 @@ export default function CourseDetailPage() {
   const courseId = params.id as string;
 
   const [course, setCourse] = useState<Course | null>(null);
+  const [attempts, setAttempts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch(`/courses/${courseId}`)
-      .then((res: any) => setCourse(res.data))
+    Promise.all([
+      apiFetch(`/courses/${courseId}`),
+      apiFetch(`/attempts/my?limit=100`)
+    ])
+      .then(([courseRes, attemptRes]: any[]) => {
+        setCourse(courseRes.data);
+        setAttempts(attemptRes.data || []);
+      })
       .catch((err: any) => setError(err.message || "Gagal memuat detail course"))
       .finally(() => setLoading(false));
   }, [courseId]);
@@ -70,8 +77,13 @@ export default function CourseDetailPage() {
   }
 
   const sessions = course.trn_test_session || [];
-  // For UI simulation, let's assume all are open for now since we don't have user attempts mapped here yet
-  // Ideally, you'd fetch the user's attempts and check if they finished a session
+  
+  // Calculate completed sessions from attempts
+  const completedSessions = sessions.filter(s => {
+    const attempt = attempts.find(a => a.id_session === s.id_session);
+    return attempt && (attempt.status === 'Submitted' || attempt.status === 'Completed' || attempt.status === 'Timed-Out');
+  });
+  const progressPercent = sessions.length > 0 ? Math.round((completedSessions.length / sessions.length) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
@@ -105,15 +117,15 @@ export default function CourseDetailPage() {
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 KESELURUHAN PROGRES
               </span>
-              <span className="text-xl font-extrabold text-[#5b61f4]">0%</span>
+              <span className="text-xl font-extrabold text-[#5b61f4]">{progressPercent}%</span>
             </div>
             
             <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-              <div className="bg-[#5b61f4] h-full rounded-full" style={{ width: "0%" }}></div>
+              <div className="bg-[#5b61f4] h-full rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
             </div>
             
             <p className="text-[11px] font-extrabold text-slate-500 tracking-wide">
-              0/{sessions.length} Sesi Terselesaikan
+              {completedSessions.length}/{sessions.length} Sesi Terselesaikan
             </p>
           </div>
         </div>
@@ -133,39 +145,126 @@ export default function CourseDetailPage() {
                 Belum ada sesi ujian yang ditugaskan untuk course ini.
               </div>
             ) : (
-              sessions.map((session, idx) => (
-                <div key={session.id_session} className="bg-white border-2 border-[#1a365d] rounded-xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-[#eef2ff] flex items-center justify-center text-[#1a365d] shrink-0 mt-1 md:mt-0">
-                      <PlayCircle className="w-5 h-5" />
-                    </div>
+              sessions.map((session, idx) => {
+                const formatDateTimeRange = (start: string | null, end: string | null) => {
+                  if (!start && !end) return "Tersedia kapan saja";
+                  const formatOpt: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+                  const s = start ? new Date(start).toLocaleDateString('id-ID', formatOpt) : 'Kapan saja';
+                  const e = end ? new Date(end).toLocaleDateString('id-ID', formatOpt) : 'Kapan saja';
+                  return `${s} — ${e}`;
+                };
+
+                const now = new Date().getTime();
+                const startTime = session.start_time ? new Date(session.start_time).getTime() : 0;
+                const endTime = session.end_time ? new Date(session.end_time).getTime() : 0;
+                
+                let computedStatus = session.status;
+                if (computedStatus === 'Upcoming' && startTime > 0 && now >= startTime) computedStatus = 'Active';
+                if (computedStatus === 'Active' && endTime > 0 && now >= endTime) computedStatus = 'Completed';
+
+                const attempt = attempts.find(a => a.id_session === session.id_session);
+                
+                let badgeText = "BELUM DIMULAI";
+                let badgeColor = "bg-slate-100 text-slate-500";
+                
+                if (computedStatus === 'Active') {
+                  badgeText = "TERSEDIA";
+                  badgeColor = "bg-[#1a365d] text-white";
+                } else if (computedStatus === 'Completed') {
+                  badgeText = "SELESAI";
+                  badgeColor = "bg-slate-200 text-slate-600";
+                } else if (computedStatus === 'Cancelled') {
+                  badgeText = "DIBATALKAN";
+                  badgeColor = "bg-red-100 text-red-600";
+                }
+
+                if (attempt) {
+                  if (attempt.status === 'Ongoing') {
+                    badgeText = "SEDANG BERJALAN";
+                    badgeColor = "bg-yellow-100 text-yellow-700";
                     
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[9px] font-extrabold px-2.5 py-0.5 rounded bg-[#1a365d] text-white tracking-wide uppercase">
-                          TERSEDIA
-                        </span>
-                        <span className="text-xs text-slate-400 font-bold">
-                          Sesi {idx + 1}
-                        </span>
+                    if (computedStatus !== 'Active') {
+                      badgeText = "WAKTU HABIS";
+                      badgeColor = "bg-red-100 text-red-700";
+                    }
+                  } else {
+                    badgeText = "DIKUMPULKAN";
+                    badgeColor = "bg-green-100 text-green-700";
+                  }
+                }
+
+                let actionText = "Lihat Detail Sesi";
+                let actionHref = `/user/courses/${course.id}/sessions/${session.id_session}`;
+                let disabled = false;
+
+                if (attempt) {
+                  if (attempt.status === 'Ongoing') {
+                    if (computedStatus === 'Active') {
+                      actionText = "Lanjutkan Ujian";
+                      actionHref = `/user/courses/${course.id}/sessions/${session.id_session}/active`;
+                    } else {
+                      actionText = "Waktu Habis";
+                      disabled = true;
+                    }
+                  } else {
+                    actionText = "Lihat Hasil";
+                    actionHref = `/user/courses/${course.id}/sessions/${session.id_session}/results?attemptId=${attempt.id_test_attempt}`;
+                  }
+                } else {
+                  if (computedStatus === 'Upcoming') {
+                    actionText = "Belum Tersedia";
+                    disabled = true;
+                  } else if (computedStatus === 'Completed') {
+                    actionText = "Sesi Berakhir";
+                    disabled = true;
+                  } else if (computedStatus === 'Cancelled') {
+                    actionText = "Sesi Dibatalkan";
+                    disabled = true;
+                  }
+                }
+
+                return (
+                  <div key={session.id_session} className={`bg-white border-2 rounded-xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md ${computedStatus === 'Active' ? 'border-[#1a365d]' : 'border-slate-200'}`}>
+                    <div className="flex items-start gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1 md:mt-0 ${computedStatus === 'Active' ? 'bg-[#eef2ff] text-[#1a365d]' : 'bg-slate-100 text-slate-400'}`}>
+                        {attempt && attempt.status !== 'Ongoing' ? <CheckCircle2 className="w-5 h-5 text-green-600" /> : <PlayCircle className="w-5 h-5" />}
                       </div>
-                      <h4 className="text-base font-extrabold text-slate-800 leading-tight">
-                        {session.session_name}
-                      </h4>
-                      <p className="text-xs text-slate-400 font-medium">
-                        {session.end_time ? `Tersedia hingga ${new Date(session.end_time).toLocaleDateString("id-ID")}` : "Tersedia kapan saja"}
-                      </p>
+                      
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-[9px] font-extrabold px-2.5 py-0.5 rounded tracking-wide uppercase ${badgeColor}`}>
+                            {badgeText}
+                          </span>
+                          <span className="text-xs text-slate-400 font-bold">
+                            Sesi {idx + 1}
+                          </span>
+                        </div>
+                        <h4 className="text-base font-extrabold text-slate-800 leading-tight">
+                          {session.session_name}
+                        </h4>
+                        <p className="text-xs text-slate-400 font-medium">
+                          {formatDateTimeRange(session.start_time, session.end_time)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="w-full md:w-auto">
+                      {disabled ? (
+                        <button disabled className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-400 text-xs font-extrabold rounded-lg shadow-sm w-full md:w-auto cursor-not-allowed">
+                          {actionText}
+                        </button>
+                      ) : (
+                        <Link href={actionHref}>
+                          <button className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#1a365d] hover:bg-[#122644] text-white text-xs font-extrabold rounded-lg transition-colors shadow-sm shrink-0 w-full md:w-auto">
+                            {actionText}
+                            <ArrowRight className="w-4 h-4" />
+                          </button>
+                        </Link>
+                      )}
                     </div>
                   </div>
-
-                  <Link href={`/user/courses/${course.id}/sessions/${session.id_session}`} className="w-full md:w-auto">
-                    <button className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#1a365d] hover:bg-[#122644] text-white text-xs font-extrabold rounded-lg transition-colors shadow-sm shrink-0 w-full md:w-auto">
-                      Lihat Detail Sesi
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </Link>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

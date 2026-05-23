@@ -59,12 +59,32 @@ export default function ActiveExamPage() {
         const qs = attemptData.trn_attempt_question ?? [];
         setQuestions(qs);
 
+        // Check if session has ended globally
+        const sessionEndTime = attemptData.trn_test_session?.end_time ? new Date(attemptData.trn_test_session.end_time).getTime() : 0;
+        if (sessionEndTime > 0 && Date.now() >= sessionEndTime) {
+          try {
+            await timeoutAttempt(attemptData.id_test_attempt);
+          } catch {}
+          localStorage.removeItem(`attempt_session_${sessionId}`);
+          router.push(`/user/courses/${courseId}/sessions/${sessionId}/results?attemptId=${attemptData.id_test_attempt}&timed_out=1`);
+          return;
+        }
+
         // Set countdown from session duration
         const duration = attemptData.trn_test_session?.duration_minutes ?? 90;
         const elapsed = attemptData.started_at
           ? Math.floor((Date.now() - new Date(attemptData.started_at).getTime()) / 1000)
           : 0;
-        setTimeLeft(Math.max(0, duration * 60 - elapsed));
+          
+        let maxTimeLeft = duration * 60 - elapsed;
+        if (sessionEndTime > 0) {
+          const secondsUntilSessionEnd = Math.floor((sessionEndTime - Date.now()) / 1000);
+          if (secondsUntilSessionEnd < maxTimeLeft) {
+            maxTimeLeft = secondsUntilSessionEnd;
+          }
+        }
+        
+        setTimeLeft(Math.max(0, maxTimeLeft));
       } catch (err: any) {
         // If already has ongoing attempt, try to recover
         if (err.message?.includes("ongoing")) {

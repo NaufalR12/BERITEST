@@ -13,6 +13,7 @@ interface SessionInfo {
   duration_minutes: number;
   passing_score: number;
   status: string;
+  description?: string;
   trn_session_question_group?: { id_question_group: number; mst_group_question: { group_name: string; _count?: { trn_question_group_item: number } } }[];
 }
 
@@ -116,10 +117,19 @@ export default function ExamPreparationPage() {
                   onClick={() => setSelectedGroup(g.id_question_group)}
                   className={`w-full text-left px-4 py-3 border-2 rounded-xl text-sm font-semibold transition-all ${selectedGroup === g.id_question_group ? "border-[#1a365d] bg-[#f0f4ff]" : "border-slate-200 bg-white hover:bg-slate-50"}`}>
                   <span className="font-bold text-[#1a365d]">{g.mst_group_question.group_name}</span>
-                  <span className="text-slate-400 text-xs ml-2">— {g.mst_group_question._count?.trn_question_group_item ?? 0} soal</span>
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Description */}
+        {session?.description && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-8 w-full max-w-2xl shadow-sm space-y-4">
+            <h3 className="text-lg font-bold text-[#1a365d]">Deskripsi Sesi</h3>
+            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+              {session.description}
+            </p>
           </div>
         )}
 
@@ -150,10 +160,16 @@ export default function ExamPreparationPage() {
 
         {/* Actions */}
         <div className="flex flex-col items-center gap-4 w-full pt-2">
-          <button onClick={handleStartTest} disabled={groups.length > 1 && !selectedGroup}
-            className="px-10 py-3.5 bg-[#1a365d] hover:bg-[#122644] text-white text-sm font-extrabold rounded-lg transition-colors shadow-md w-full max-w-xs disabled:opacity-50">
-            Mulai Test Sekarang
-          </button>
+          {session?.status === "Active" ? (
+            <button onClick={handleStartTest} disabled={groups.length > 1 && !selectedGroup}
+              className="px-10 py-3.5 bg-[#1a365d] hover:bg-[#122644] text-white text-sm font-extrabold rounded-lg transition-colors shadow-md w-full max-w-xs disabled:opacity-50">
+              Mulai Test Sekarang
+            </button>
+          ) : (
+            <div className="w-full max-w-xs text-center p-3 rounded-lg bg-slate-100 text-slate-500 font-bold text-sm">
+              {session?.status === "Upcoming" ? "Sesi Ujian Belum Dimulai" : "Sesi Ujian Telah Berakhir"}
+            </div>
+          )}
           <Link href={`/user/courses/${courseId}`} className="text-xs text-slate-400 font-bold hover:text-slate-600 transition-colors hover:underline">
             Batal dan Kembali ke Dashboard
           </Link>
